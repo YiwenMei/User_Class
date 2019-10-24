@@ -64,7 +64,7 @@ methods
         nm=[nm fex ':' obj.Vnm];
 
       case {'.asc','.txt'}
-        v2d=double(readmatrix(obj.Fnm,'Delimiter',obj.Vnm,'NumHeaderLines',5));
+        v2d=double(readmatrix(obj.Fnm,'Delimiter',',','NumHeaderLines',5));
         nm=[nm fex];
 
       case '.mat'

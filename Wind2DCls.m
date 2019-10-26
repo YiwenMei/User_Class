@@ -56,24 +56,29 @@ methods
   function [ws,wa,U,V]=readCls(obj)
     U=[];
     for v=1:size(obj.Fnm,1)
-      [~,~,fex]=fileparts(obj.Fnm(v,:));
+      [~,nm,fex]=fileparts(obj.Fnm(v,:));
       switch fex
         case {'.tif','tiff'} % compatable for .tiff
           U=cat(3,U,double(imread(obj.Fnm(v,:))));
+          nm=[nm fex];
 
         case {'.nc4','nc'} % compatable for .nc
           U=cat(3,U,double(ncread(obj.Fnm(v,:),obj.Vnm{v}))');
+          nm=[nm fex ':' obj.Vnm{v}];
 
         case {'.hdf','hdf5'} % compatable for .hdf5
           U=cat(3,U,double(hdfread(obj.Fnm(v,:),obj.Vnm{v})));
+          nm=[nm fex ':' obj.Vnm{v}];
 
         case {'.asc','.txt'}
           U=cat(3,U,double(readmatrix(obj.Fnm(v,:),'Delimiter',',','NumHeaderLines',5)));
+          nm=[nm fex];
 
         case '.mat'
           V=matfile(obj.Fnm(v,:));
           eval(sprintf('V=V.%s;',obj.Vnm{v}));
           U=cat(3,U,V);
+          nm=[nm fex ':' obj.Vnm{v}];
       end
     end
     U(U==obj.ndv)=NaN;
@@ -86,7 +91,17 @@ methods
     ws=hypot(U,V);
 
 % Check the output
-    validateattributes(ws(~isnan(ws)),{'double'},{'<=',obj.Ulm,'>=',obj.Llm},'','Total wind');
+    k=ws>obj.Ulm | ws<obj.Llm;
+    N=length(find(k))/length(find(~isnan(ws)));
+    if N~=0
+      if N>.05
+        warning('%s has more than 5%% of data points out of bound\n',nm);
+      end
+      [X,Y]=meshgrid(1:size(ws,2),1:size(ws,1));
+      id=knnsearch([X(~isnan(ws) & ~k) Y(~isnan(ws) & ~k)],[X(k) Y(k)],'K',4);
+      V=ws(~isnan(ws));
+      ws(k)=mean(V(id),2);
+    end
   end
 
 %% Grids of variable
@@ -94,13 +109,6 @@ methods
     X=obj.Gtg(1,1)+obj.Gtg(3,1)/2:obj.Gtg(3,1):obj.Gtg(2,1)-obj.Gtg(3,1)/2;
     Y=obj.Gtg(1,2)-obj.Gtg(3,2)/2:-obj.Gtg(3,2):obj.Gtg(2,2)+obj.Gtg(3,2)/2;
     [X,Y]=meshgrid(X,Y);
-  end
-
-%% Extract the time line
-  function Ttg=TimeCls(obj)
-    [~,ds,~]=cellfun(@(X) fileparts(X(1,:)),obj.Fnm,'UniformOutput',false);
-    ds=cellfun(@(X) X(length(obj.TmF{1})+1:end),ds,'UniformOutput',false);
-    Ttg=datenum(cell2mat(ds),obj.TmF{2});
   end
 end
 end

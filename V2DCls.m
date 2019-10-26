@@ -75,7 +75,17 @@ methods
     v2d(v2d==obj.ndv)=NaN;
 
 % Check the boundary
-    validateattributes(v2d(~isnan(v2d)),{'double'},{'<=',obj.Ulm,'>=',obj.Llm},'',nm);
+    k=v2d>obj.Ulm | v2d<obj.Llm;
+    N=length(find(k))/length(find(~isnan(v2d)));
+    if N~=0
+      if N>.05
+        warning('%s has more than 5%% of data points out of bound\n',nm);
+      end
+      [X,Y]=meshgrid(1:size(v2d,2),1:size(v2d,1));
+      id=knnsearch([X(~isnan(v2d) & ~k) Y(~isnan(v2d) & ~k)],[X(k) Y(k)],'K',4);
+      v=v2d(~isnan(v2d));
+      v2d(k)=mean(v(id),2);
+    end
   end
 
 %% Grids of variable

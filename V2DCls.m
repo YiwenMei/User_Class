@@ -80,10 +80,12 @@ methods
     if N~=0
       if N>.05
         warning('%s has more than 5%% of data points out of bound\n',nm);
+      else
+        fprintf('%d points found for %s\n',length(find(k)),nm);
       end
       [X,Y]=meshgrid(1:size(v2d,2),1:size(v2d,1));
       id=knnsearch([X(~isnan(v2d) & ~k) Y(~isnan(v2d) & ~k)],[X(k) Y(k)],'K',4);
-      v=v2d(~isnan(v2d));
+      v=v2d(~isnan(v2d))';
       v2d(k)=mean(v(id),2);
     end
   end

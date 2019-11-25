@@ -83,16 +83,30 @@ methods
 
 %% Unify the time line
   function [TL1,TL2]=UniTL(obj,CTp)
+% Align the time series
     switch CTp
       case 'UTC'
-        TL1=obj.TL1+obj.os1;
-        TL2=obj.TL2+obj.os2;
+        TL1=obj.TL1+obj.os1/24;
+        TL2=obj.TL2+obj.os2/24;
       case 'tg'
         TL1=obj.TL1;
-        TL2=obj.TL2+obj.os2-obj.os1;
+        TL2=obj.TL2+obj.os2/24-obj.os1/24;
       case 'rf'
-        TL1=obj.TL1+obj.os1-obj.os2;
+        TL1=obj.TL1+obj.os1/24-obj.os2/24;
         TL2=obj.TL2;
+    end
+
+% Convert the time convention
+    if strcmp(obj.TC1,'begin')
+      TL1=obj.TL1+obj.TR1/24/2;
+    elseif strcmp(obj.TC1,'end')
+      TL1=obj.TL1-obj.TR1/24/2;
+    end
+
+    if strcmp(obj.TC2,'begin')
+      TL2=obj.TL2+obj.TR2/24/2;
+    elseif strcmp(obj.TC2,'end')
+      TL2=obj.TL2-obj.TR2/24/2;
     end
   end
 end

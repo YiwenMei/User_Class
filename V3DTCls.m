@@ -1,5 +1,5 @@
-classdef V2DTCls
-% V2DTCls is a class for a stack of spatial raster image with a time line.
+classdef V3DTCls
+% V3DTCls is a class for a series of 3D image with a time line.
 
 properties
   Fnm % Name of the file(s)
@@ -9,10 +9,11 @@ properties
   Llm % Physical lower limit
   GIC % Convention of the geographic information (can be supplied as a retagualr domain "Boundary" or
       %  "Coordinate" of horizontal and vertical grid center)
-  GIf % Geographic information of the variable; for regular grid, it is specified as a 3-by-2 matrix
+  GIf % Geographic information of the variable; for 'Boundary', it is specified as a 3-by-2 matrix
       %  [xl yt;xr yb;Rx Ry] where x/y/R is the horizontal/vertical/resolution, l/r/b/t stands for
-      %  left/right/bottom/top; for irregular grid, it is a structure array with two field, x & y,
-      %  for the horizontal and vertical coordinate
+      %  left/right/bottom/top; for 'Coordinate', it is a structure array with two field, x & y,
+      %  for the horizontal and vertical coordinate of grid center
+  VHt % Height(-)/depth(+) of vertical layer
   ofs % offset to UTC in hour
   TmC % Time-window convention
   TmR % Time resolution in number of hours
@@ -24,8 +25,8 @@ end
 
 methods
 %% Object building
-  function obj=V2DTCls(Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,ofs,TmC,TmR,TmF,varargin)
-    narginchk(11,13);
+  function obj=V3DTCls(Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,VHt,ofs,TmC,TmR,TmF,varargin)
+    narginchk(12,14);
     ips=inputParser;
     ips.FunctionName=mfilename;
 
@@ -42,6 +43,7 @@ methods
     else
       error('Spatial extend convention must be "Bound/Grids" for boundary/grids');
     end
+    addRequired(ips,'VHt',@(x) validateattributes(x,{'double'},{'vector'},mfilename,'VHt'));
     addRequired(ips,'ofs',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'ofs'));
     addRequired(ips,'TmC',@(x) validateattributes(x,{'char'},{'nonempty'},mfilename,'TmC'));
     addRequired(ips,'TmR',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'TmR'));
@@ -50,7 +52,7 @@ methods
     addOptional(ips,'Vnm','',@(x) validateattributes(x,{'char'},{},mfilename,'Vnm'));
     addOptional(ips,'unt','-',@(x) validateattributes(x,{'char'},{},mfilename,'unt'));
 
-    parse(ips,Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,ofs,TmC,TmR,TmF,varargin{:});
+    parse(ips,Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,VHt,ofs,TmC,TmR,TmF,varargin{:});
     Vnm=ips.Results.Vnm;
     unt=ips.Results.unt;
     clear ips varargin
@@ -62,6 +64,7 @@ methods
     obj.Llm=Llm;
     obj.GIC=GIC;
     obj.GIf=GIf;
+    obj.VHt=VHt;
     obj.ofs=ofs;
     obj.TmC=TmC;
     obj.TmR=TmR;
@@ -71,42 +74,35 @@ methods
     obj.unt=unt;
   end
 
-%% Forcing variable reading
-  function v2d=readCls(obj,n)
+%% Read one/all layer of a time step
+  function v2d=readCls(obj,n,varargin)
+    l=cell2mat(varargin);
     [~,nm,fex]=fileparts(obj.Fnm{n});
+    nm=[nm fex];
 
     switch obj.TmF{3}
-      case {'tif','tiff'} % compatable for .tiff
-        v2d=double(imread(obj.Fnm{n}));
-        nm=[nm fex];
-
       case {'nc4','nc'} % compatable for .nc
-        if strcmp(obj.TmF{4},'SW')
-          v2d=double(rot90(ncread(obj.Fnm{n},obj.Vnm)));
-        else % NW
-          v2d=double(ncread(obj.Fnm{n},obj.Vnm))';
-        end
-        nm=[nm fex ':' obj.Vnm];
-
-      case {'hdf','hdf5'} % compatable for .hdf5
-        if strcmp(obj.TmF{4},'SW')
-          v2d=double(rot90(hdfread(obj.Fnm{n},obj.Vnm)));
+        if ~isempty(l)
+          L=ones(1,4);
+          L(obj.TmF{4}(3))=l;
+          v2d=ncread(obj.Fnm{n},obj.Vnm,L,[Inf 1 Inf 1]);
+          v2d=double(flipud(permute(v2d,obj.TmF{4})));
+          nm=sprintf('%s-%s-L%i',nm,obj.Vnm,l);
         else
-          v2d=double(hdfread(obj.Fnm{n},obj.Vnm))';
-        end  
-        nm=[nm fex ':' obj.Vnm];
-
-      case {'asc','txt'}
-        v2d=double(readmatrix(obj.Fnm{n},'Delimiter',obj.Vnm,'NumHeaderLines',5));
-        nm=[nm fex];
+          v2d=ncread(obj.Fnm{n},obj.Vnm,[1 1 1 1],[Inf Inf Inf 1]);
+          v2d=double(flipud(permute(v2d,obj.TmF{4})));
+          nm=sprintf('%s-%s-All',nm,obj.Vnm);
+        end
 
       case 'mat'
         v2d=matfile(obj.Fnm{n});
         eval(sprintf('v2d=v2d.%s;',obj.Vnm));
-        nm=[nm fex ':' obj.Vnm];
-
-      otherwise
-        error('Format not supported');
+        if ~isempty(l)
+          v2d=v2d(:,:,l);
+          nm=sprintf('%s-%s-L%i',nm,obj.Vnm,l);
+        else
+          nm=sprintf('%s-%s-All',nm,obj.Vnm);
+        end
     end
     v2d(v2d==obj.ndv)=NaN;
 
@@ -125,14 +121,12 @@ methods
         X=obj.GIf.x;
         Y=obj.GIf.y;
         rsn=round(abs([mean(diff(obj.GIf.x)) mean(diff(obj.GIf.y))]));
-      otherwise
-        error('Spatial extend convention must be "Bound/Grids" for boundary/grids');
     end
     [X,Y]=meshgrid(X,Y);
-    sz=size(X);
+    sz=[size(X) length(obj.VHt)];
   end
 
-%% Extract the time line
+%% Time line of file
   function Tutc=TimeCls(obj,Cflg)
 % Convert to the UTC time line
     [~,ds,~]=cellfun(@(X) fileparts(X),obj.Fnm,'UniformOutput',false);

@@ -7,7 +7,8 @@ properties
   ndv % No data value for the variable
   Ulm % Physical upper limit
   Llm % Physical lower limit
-  Gtg % Geographic information of the variable ([xl yt;xr yb;Rx Ry] where x/y/R is
+  GIC % Convention of the geographic information ('R'/'I' for regular/irregular grid)
+  GIf % Geographic information of the variable ([xl yt;xr yb;Rx Ry] where x/y/R is
       %  the horizontal/vertical/resolution, l/r/b/t stands for left/right/bottom/top)
 
   Vnm % Name of the variable
@@ -16,8 +17,8 @@ end
 
 methods
 %% Object building
-  function obj=V2DCls(Fnm,vtp,ndv,Ulm,Llm,Gtg,varargin)
-    narginchk(6,8);
+  function obj=V2DCls(Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,varargin)
+    narginchk(7,9);
     ips=inputParser;
     ips.FunctionName=mfilename;
 
@@ -26,12 +27,19 @@ methods
     addRequired(ips,'ndv',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'ndv'));
     addRequired(ips,'Ulm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Ulm'));
     addRequired(ips,'Llm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Llm'));
-    addRequired(ips,'Gtg',@(x) validateattributes(x,{'double'},{'size',[3,2]},mfilename,'Gtg'));
+    addRequired(ips,'GIC',@(x) validateattributes(x,{'char'},{'nonempty'},mfilename,'GIC'));
+    if strcmp(GIC,'Bound')
+      addRequired(ips,'GIf',@(x) validateattributes(x,{'double'},{'size',[3,2]},mfilename,'GIf'));
+    elseif strcmp(GIC,'Grids')
+      addRequired(ips,'GIf',@(x) validateattributes(x,{'struct'},{'nonempty'},mfilename,'GIf'));
+    else
+      error('Spatial extend convention must be "Bound/Grids" for boundary/grids');
+    end
 
     addOptional(ips,'Vnm','',@(x) validateattributes(x,{'char'},{},mfilename,'Vnm'));
     addOptional(ips,'unt','-',@(x) validateattributes(x,{'char'},{},mfilename,'unt'));
 
-    parse(ips,Fnm,vtp,ndv,Ulm,Llm,Gtg,varargin{:});
+    parse(ips,Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,varargin{:});
     Vnm=ips.Results.Vnm;
     unt=ips.Results.unt;
     clear ips varargin
@@ -41,7 +49,8 @@ methods
     obj.ndv=ndv;
     obj.Ulm=Ulm;
     obj.Llm=Llm;
-    obj.Gtg=Gtg;
+    obj.GIC=GIC;
+    obj.GIf=GIf;
 
     obj.Vnm=Vnm;
     obj.unt=unt;
@@ -72,7 +81,9 @@ methods
         eval(sprintf('v2d=v2d.%s;',obj.Vnm));
         nm=[nm fex ':' obj.Vnm];
     end
-    v2d(v2d==obj.ndv)=NaN;
+    if ~isnan(obj.ndv)
+      v2d(v2d==obj.ndv)=NaN;
+    end
 
 % Check the boundary
     k=v2d>obj.Ulm | v2d<obj.Llm;
@@ -91,10 +102,19 @@ methods
   end
 
 %% Grids of variable
-  function [X,Y]=GridCls(obj)
-    X=obj.Gtg(1,1)+obj.Gtg(3,1)/2:obj.Gtg(3,1):obj.Gtg(2,1)-obj.Gtg(3,1)/2;
-    Y=obj.Gtg(1,2)-obj.Gtg(3,2)/2:-obj.Gtg(3,2):obj.Gtg(2,2)+obj.Gtg(3,2)/2;
+  function [X,Y,sz,rsn]=GridCls(obj)
+    switch obj.GIC
+      case 'Bound'
+        X=obj.GIf(1,1)+obj.GIf(3,1)/2:obj.GIf(3,1):obj.GIf(2,1)-obj.GIf(3,1)/2;
+        Y=obj.GIf(1,2)-obj.GIf(3,2)/2:-obj.GIf(3,2):obj.GIf(2,2)+obj.GIf(3,2)/2;
+        rsn=obj.GIf(3,:);
+      case 'Grids'
+        X=obj.GIf.x;
+        Y=obj.GIf.y;        
+        rsn=round(abs([mean(diff(obj.GIf.x)) mean(diff(obj.GIf.y))]));
+    end
     [X,Y]=meshgrid(X,Y);
+    sz=size(X);
   end
 end
 end

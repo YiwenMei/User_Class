@@ -10,7 +10,7 @@ properties
   ndv % No data value for the variables
   Ulm % Physical upper limit of the total wind
   Llm % Physical lower limit of the total wind
-  Gtg % Geographic information of the variables ([xl yt;xr yb;Rx Ry] where x/y/R
+  GIf % Geographic information of the variables ([xl yt;xr yb;Rx Ry] where x/y/R
       %  is the horizontal/vertical/resolution, l/r/b/t stands for left/right/bottom/top)
   ofs % offset to UTC in hour
   TmC % Time-window convention
@@ -25,7 +25,7 @@ end
 
 methods
 %% Object building
-  function obj=Wind2DTCls(Fnm,ndv,Ulm,Llm,Gtg,ofs,TmC,TmR,TmF,varargin)
+  function obj=Wind2DTCls(Fnm,ndv,Ulm,Llm,GIf,ofs,TmC,TmR,TmF,varargin)
     narginchk(9,11);
     ips=inputParser;
     ips.FunctionName=mfilename;
@@ -34,7 +34,7 @@ methods
     addRequired(ips,'ndv',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'ndv'));
     addRequired(ips,'Ulm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Ulm'));
     addRequired(ips,'Llm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Llm'));
-    addRequired(ips,'Gtg',@(x) validateattributes(x,{'double'},{'size',[3,2]},mfilename,'Gtg'));
+    addRequired(ips,'GIf',@(x) validateattributes(x,{'double'},{'size',[3,2]},mfilename,'GIf'));
     addRequired(ips,'ofs',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'ofs'));
     addRequired(ips,'TmC',@(x) validateattributes(x,{'char'},{'nonempty'},mfilename,'TmC'));
     addRequired(ips,'TmR',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'TmR'));
@@ -43,7 +43,7 @@ methods
     addOptional(ips,'Vnm',{},@(x) validateattributes(x,{'cell'},{},mfilename,'Vnm'));
     addOptional(ips,'unt','m/s',@(x) validateattributes(x,{'char'},{},mfilename,'unt'));
 
-    parse(ips,Fnm,ndv,Ulm,Llm,Gtg,ofs,TmC,TmR,TmF,varargin{:});
+    parse(ips,Fnm,ndv,Ulm,Llm,GIf,ofs,TmC,TmR,TmF,varargin{:});
     Vnm=ips.Results.Vnm;
     unt=ips.Results.unt;
     clear ips varargin
@@ -53,7 +53,7 @@ methods
     obj.ndv=ndv;
     obj.Ulm=Ulm;
     obj.Llm=Llm;
-    obj.Gtg=Gtg;
+    obj.GIf=GIf;
     obj.ofs=ofs;
     obj.TmC=TmC;
     obj.TmR=TmR;
@@ -102,16 +102,47 @@ methods
 
 %% Grids of variable
   function [X,Y]=GridCls(obj)
-    X=obj.Gtg(1,1)+obj.Gtg(3,1)/2:obj.Gtg(3,1):obj.Gtg(2,1)-obj.Gtg(3,1)/2;
-    Y=obj.Gtg(1,2)-obj.Gtg(3,2)/2:-obj.Gtg(3,2):obj.Gtg(2,2)+obj.Gtg(3,2)/2;
+    X=obj.GIf(1,1)+obj.GIf(3,1)/2:obj.GIf(3,1):obj.GIf(2,1)-obj.GIf(3,1)/2;
+    Y=obj.GIf(1,2)-obj.GIf(3,2)/2:-obj.GIf(3,2):obj.GIf(2,2)+obj.GIf(3,2)/2;
     [X,Y]=meshgrid(X,Y);
   end
 
 %% Extract the time line
-  function Ttg=TimeCls(obj)
+  function Tutc=TimeCls(obj,Cflg)
+% Convert to the UTC time line
     [~,ds,~]=cellfun(@(X) fileparts(X(1,:)),obj.Fnm,'UniformOutput',false);
     ds=cellfun(@(X) X(length(obj.TmF{1})+1:end),ds,'UniformOutput',false);
-    Ttg=datenum(cell2mat(ds),obj.TmF{2});
+    Tutc=datenum(cell2mat(ds),obj.TmF{2});
+    if obj.ofs~=0
+      Tutc=Tutc+obj.ofs;
+    end
+
+% Adjust to user specified time convention 
+    switch Cflg
+      case 'begin' % To
+        switch obj.TmC
+          case 'center' % From
+            Tutc=Tutc-obj.TmR/24/2;
+          case 'end' % From
+            Tutc=Tutc-obj.TmR/24;
+        end
+
+      case 'center'
+        switch obj.TmC
+          case 'begin'
+            Tutc=Tutc+obj.TmR/24/2;
+          case 'end'
+            Tutc=Tutc-obj.TmR/24/2;
+        end
+
+      case 'end'
+        switch obj.TmC
+          case 'center'
+            Tutc=Tutc+obj.TmR/24/2;
+          case 'begin'
+            Tutc=Tutc+obj.TmR/24;
+        end
+    end
   end
 end
 end

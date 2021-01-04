@@ -36,16 +36,16 @@ methods
     addRequired(ips,'Ulm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Ulm'));
     addRequired(ips,'Llm',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'Llm'));
     addRequired(ips,'Gtg',@(x) validateattributes(x,{'struct'},{'nonempty'},mfilename,'Gtg'));
-    addRequired(ips,'gid',@(x) validateattributes(x,{'double','cell'},{'nonempty'},mfilename,'gid'));
+    addRequired(ips,'gid',@(x) validateattributes(x,{'double','char'},{'nonempty'},mfilename,'gid'));
     addRequired(ips,'os1',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'os1'));
     addRequired(ips,'TS1',@(x) validateattributes(x,{'double'},{'nonempty'},mfilename,'TS1'));
     addRequired(ips,'TL1',@(x) validateattributes(x,{'double'},{'vector'},mfilename,'TL1'));
-    addRequired(ips,'TR1',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'TR1'));
+    addRequired(ips,'TR1',@(x) validateattributes(x,{'double','char'},{'nonempty'},mfilename,'TR1'));
     addRequired(ips,'TC1',@(x) validateattributes(x,{'char'},{'nonempty'},mfilename,'TC1'));
     addRequired(ips,'os2',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'os2'));
     addRequired(ips,'TS2',@(x) validateattributes(x,{'double'},{'nonempty'},mfilename,'TS2'));
     addRequired(ips,'TL2',@(x) validateattributes(x,{'double'},{'vector'},mfilename,'TL2'));
-    addRequired(ips,'TR2',@(x) validateattributes(x,{'double'},{'scalar'},mfilename,'TR2'));
+    addRequired(ips,'TR2',@(x) validateattributes(x,{'double','char'},{'nonempty'},mfilename,'TR2'));
     addRequired(ips,'TC2',@(x) validateattributes(x,{'char'},{'nonempty'},mfilename,'TC2'));
     addRequired(ips,'Vh1',@(x) validateattributes(x,{'double'},{'vector','numel',size(TS1,2)},...
         mfilename,'Vh1'));
@@ -101,6 +101,13 @@ methods
     end
 
 % Convert to center time convention
+    if ischar(obj.TR1)
+      obj.TR1=0;
+    end
+    if ischar(obj.TR2)
+      obj.TR2=0;
+    end
+
     if strcmp(obj.TC1,'begin')
       TL1=obj.TL1+obj.TR1/24/2;
     elseif strcmp(obj.TC1,'end')

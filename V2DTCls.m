@@ -20,12 +20,13 @@ properties
 
   Vnm % Name of the variable
   unt % Unit of the variable
+  srs % Spatial reference system (e.g. wgs84)
 end
 
 methods
 %% Object building
   function obj=V2DTCls(Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,ofs,TmC,TmR,TmF,varargin)
-    narginchk(11,13);
+    narginchk(11,14);
     ips=inputParser;
     ips.FunctionName=mfilename;
 
@@ -49,10 +50,12 @@ methods
 
     addOptional(ips,'Vnm','',@(x) validateattributes(x,{'char'},{},mfilename,'Vnm'));
     addOptional(ips,'unt','-',@(x) validateattributes(x,{'char'},{},mfilename,'unt'));
+    addOptional(ips,'srs','wgs84',@(x) validateattributes(x,{'char'},{},mfilename,'srs'));
 
     parse(ips,Fnm,vtp,ndv,Ulm,Llm,GIC,GIf,ofs,TmC,TmR,TmF,varargin{:});
     Vnm=ips.Results.Vnm;
     unt=ips.Results.unt;
+    srs=ips.Results.srs;
     clear ips varargin
 
     obj.Fnm=Fnm;
@@ -69,6 +72,7 @@ methods
 
     obj.Vnm=Vnm;
     obj.unt=unt;
+    obj.srs=srs;
   end
 
 %% Forcing variable reading
@@ -124,7 +128,8 @@ methods
       case 'Grids'
         X=obj.GIf.x;
         Y=obj.GIf.y;
-        rsn=round(abs([mean(diff(obj.GIf.x)) mean(diff(obj.GIf.y))]));
+        rsn=abs([mean(diff(obj.GIf.x)) mean(diff(obj.GIf.y))]);
+%         rsn=round(abs([mean(diff(obj.GIf.x)) mean(diff(obj.GIf.y))]));
       otherwise
         error('Spatial extend convention must be "Bound/Grids" for boundary/grids');
     end
@@ -132,7 +137,7 @@ methods
     sz=size(X);
   end
 
-%% Extract the time line
+%% Convert the time line to UTC
   function Tutc=TimeCls(obj,Cflg)
 % Convert to the UTC time line
     [~,ds,~]=cellfun(@(X) fileparts(X),obj.Fnm,'UniformOutput',false);
